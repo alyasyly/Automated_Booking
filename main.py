@@ -4,13 +4,14 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import os
 from dotenv import load_dotenv
+from datetime import datetime, timedelta,date
 
 
 load_dotenv()
 
-ACCOUNT_EMAIL = os.getenv("ACCOUNT_EMAIL")
-ACCOUNT_PASSWORD = os.getenv("ACCOUNT_PASSWORD")
-GYM_URL = os.getenv("GYM_URL")
+ACCOUNT_EMAIL: str = os.getenv("ACCOUNT_EMAIL") or ""
+ACCOUNT_PASSWORD: str = os.getenv("ACCOUNT_PASSWORD") or ""
+GYM_URL: str = os.getenv("GYM_URL") or ""
 
 
 
@@ -49,7 +50,27 @@ class GymBot:
         except Exception as e:
             print(f"An error occurred during login: {e}")
 
+        self.finding_all_classes()
 
+    def get_next_tu(self):
+        today = date.today()
+        TUESDAY = 1
+        days_until_tuesday = (TUESDAY - today.weekday()) % 7
+        next_tuesday = today + timedelta(days=days_until_tuesday)
+        return next_tuesday
+            
+    def finding_all_classes(self):
+        try:
+            class_cards = self.driver.find_elements(By.CSS_SELECTOR, 'div[id^="class-card-"]')
+            next_tuesday_str = self.get_next_tu().strftime("%Y-%m-%d")+'-1800'
+            for class_card in class_cards:
+                class_id = class_card.get_attribute('id')
+                if next_tuesday_str in class_id:
+                    butoon = class_card.find_element(By.TAG_NAME,'button')
+                    butoon.click()
+                    print(f'booked class {class_card.find_element(By.TAG_NAME,'h3').text} at {self.get_next_tu().strftime("%a, %b %d ")}')
+        except Exception as e:
+            print(f"An error occurred while finding class cards: {e}")
         
 
 
