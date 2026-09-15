@@ -54,7 +54,7 @@ class GymBot:
 
     def get_next_tu(self):
         today = date.today()
-        TUESDAY = 1
+        TUESDAY = 0
         days_until_tuesday = (TUESDAY - today.weekday()) % 7
         next_tuesday = today + timedelta(days=days_until_tuesday)
         return next_tuesday
@@ -63,12 +63,22 @@ class GymBot:
         try:
             class_cards = self.driver.find_elements(By.CSS_SELECTOR, 'div[id^="class-card-"]')
             next_tuesday_str = self.get_next_tu().strftime("%Y-%m-%d")+'-1800'
+            next_day = self.get_next_tu().strftime("%a, %b %d ")
             for class_card in class_cards:
                 class_id = class_card.get_attribute('id')
                 if next_tuesday_str in class_id:
                     butoon = class_card.find_element(By.TAG_NAME,'button')
-                    butoon.click()
-                    print(f'booked class {class_card.find_element(By.TAG_NAME,'h3').text} at {self.get_next_tu().strftime("%a, %b %d ")}')
+                    if butoon.text.lower() == 'book class':
+                        butoon.click()
+                        print(f'booked class {class_card.find_element(By.TAG_NAME,'h3').text} on {next_day}')
+                    elif butoon.text.lower() == 'booked':
+                        print(f'Already booked: {class_card.find_element(By.TAG_NAME,'h3').text} on {next_day}')
+                    elif butoon.text.lower() == 'join waitlist':
+                        butoon.click()
+                        print(f'Joined waitlist for: {class_card.find_element(By.TAG_NAME,'h3').text} on {next_day}')
+                    elif butoon.text.lower() == 'waitlisted':
+                        print(f'Already on waitlist: {class_card.find_element(By.TAG_NAME,'h3').text} on {next_day}')
+
         except Exception as e:
             print(f"An error occurred while finding class cards: {e}")
         
