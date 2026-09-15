@@ -64,20 +64,33 @@ class GymBot:
             class_cards = self.driver.find_elements(By.CSS_SELECTOR, 'div[id^="class-card-"]')
             next_tuesday_str = self.get_next_tu().strftime("%Y-%m-%d")+'-1800'
             next_day = self.get_next_tu().strftime("%a, %b %d ")
+            booked_classes = 0
+            waitlists_joined = 0
+            already_booked_waitlisted = 0
             for class_card in class_cards:
                 class_id = class_card.get_attribute('id')
                 if next_tuesday_str in class_id:
                     butoon = class_card.find_element(By.TAG_NAME,'button')
                     if butoon.text.lower() == 'book class':
                         butoon.click()
+                        booked_classes += 1
                         print(f'booked class {class_card.find_element(By.TAG_NAME,'h3').text} on {next_day}')
                     elif butoon.text.lower() == 'booked':
+                        already_booked_waitlisted += 1
                         print(f'Already booked: {class_card.find_element(By.TAG_NAME,'h3').text} on {next_day}')
                     elif butoon.text.lower() == 'join waitlist':
                         butoon.click()
+                        waitlists_joined += 1
                         print(f'Joined waitlist for: {class_card.find_element(By.TAG_NAME,'h3').text} on {next_day}')
                     elif butoon.text.lower() == 'waitlisted':
+                        already_booked_waitlisted += 1
                         print(f'Already on waitlist: {class_card.find_element(By.TAG_NAME,'h3').text} on {next_day}')
+
+            print('--- BOOKING SUMMARY ---')
+            print(f"Classes booked: {booked_classes}")
+            print(f"Waitlists joined: {waitlists_joined}")
+            print(f"Already booked/waitlisted: {already_booked_waitlisted}")
+            print(f'Total Tuesday 6pm classes processed: {booked_classes + waitlists_joined + already_booked_waitlisted}')
 
         except Exception as e:
             print(f"An error occurred while finding class cards: {e}")
