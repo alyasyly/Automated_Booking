@@ -3,17 +3,16 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import os
+import re
 from dotenv import load_dotenv
-from datetime import datetime, timedelta,date
+from datetime import datetime
 from selenium.common.exceptions import NoSuchElementException 
-
 
 load_dotenv()
 
 ACCOUNT_EMAIL: str = os.getenv("ACCOUNT_EMAIL") or ""
 ACCOUNT_PASSWORD: str = os.getenv("ACCOUNT_PASSWORD") or ""
 GYM_URL: str = os.getenv("GYM_URL") or ""
-
 
 
 class GymBot:
@@ -25,9 +24,7 @@ class GymBot:
         
         self.driver = webdriver.Chrome(options=self.chrome_options)
         self.driver.get(GYM_URL)
-
-        self.wait = WebDriverWait(self.driver,10)
-
+        self.wait = WebDriverWait(self.driver, 10)
 
     def login(self):
         try:
@@ -45,7 +42,6 @@ class GymBot:
             submit_button = self.driver.find_element(By.ID, 'submit-button')
             submit_button.click()
 
-
             self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '.Schedule_scheduleTitle__zfZxg')))
             print("Login successful!")
         except Exception as e:
@@ -53,83 +49,55 @@ class GymBot:
 
         self.finding_all_classes()
 
-    def get_next_weekday(self,target_weekday):
-        today = date.today()
-        
-        days_until_target = (target_weekday - today.weekday()) % 7
-        next_target = today + timedelta(days=days_until_target)
-        return next_target
-            
     def finding_all_classes(self):
-
         try:
             class_cards = self.driver.find_elements(By.CSS_SELECTOR, 'div[id^="class-card-"]')
-            next_tuesday_str = self.get_next_weekday(1).strftime("%Y-%m-%d")+'-1800'
-            next_day_tuesday = self.get_next_weekday(1).strftime("%a, %b %d ")
-            next_thursday_str = self.get_next_weekday(3).strftime("%Y-%m-%d")+'-1800'
-            next_day_thursday = self.get_next_weekday(3).strftime("%a, %b %d ")
 
             booked_classes = 0
             waitlists_joined = 0
             already_booked_waitlisted = 0
-            processed_classes = []
-
 
             for class_card in class_cards:
-                day_label = None  # Reset day_label for the next iteration
-                class_id = class_card.get_attribute('id')
+                class_id = class_card.get_attribute('id') or ""
 
-                if next_tuesday_str in class_id:
-                    day_label = next_day_tuesday
+                match = re.search(r'(\d{4}-\d{2}-\d{2})-(1800)', class_id)
+                
+                if match:
+                    date_str = match.group(1)
+                    card_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+                    
 
-                elif next_thursday_str in class_id:
-                    day_label = next_day_thursday
+                    if card_date.weekday() in [1, 3]:
+                        day_label = card_date.strftime("%a, %b %d")
+                        button = class_card.find_element(By.TAG_NAME, 'button')
+                        class_name = class_card.find_element(By.TAG_NAME, "h3").text
+                        btn_text = button.text.lower()
 
-                if day_label:
-                    butoon = class_card.find_element(By.TAG_NAME,'button')
-                    class_name = class_card.find_element(By.TAG_NAME, "h3").text
+                        if btn_text == 'book class':
+                            button.click()
+                            booked_classes += 1
+                            print(f'✓ Booked class: {class_name} on {day_label}')
 
-                    if butoon.text.lower() == 'book class':
-                        butoon.click()
-                        booked_classes += 1
-                        processed_classes.append(f'[New Booking] {class_name} on {day_label}')
-                        print(f'booked class {class_name} on {day_label}')
+                        elif btn_text == 'booked':
+                            already_booked_waitlisted += 1
+                            print(f'✓ Already booked: {class_name} on {day_label}')
 
-                    elif butoon.text.lower() == 'booked':
-                        already_booked_waitlisted += 1
-                        processed_classes.append(f'[Booked]  {class_name} on {day_label}')
-                        print(f'Already booked: {class_name} on {day_label}')
+                        elif btn_text == 'join waitlist':
+                            button.click()
+                            waitlists_joined += 1
+                            print(f'✓ Joined waitlist for: {class_name} on {day_label}')
 
-                    elif butoon.text.lower() == 'join waitlist':
-                        butoon.click()
-                        waitlists_joined += 1
-                        processed_classes.append(f'[New Waitlist] {class_name} on {day_label}')
-                        print(f'Joined waitlist for: {class_name} on {day_label}')
-
-                    elif butoon.text.lower() == 'waitlisted':
-                        already_booked_waitlisted += 1
-                        processed_classes.append(f'[Waitlisted] {class_name} on {day_label}')
-                        print(f'Already on waitlist: {class_name} on {day_label}')
-
-
-            # print('--- BOOKING SUMMARY ---')
-            # print(f"Classes booked: {booked_classes}")
-            # print(f"Waitlists joined: {waitlists_joined}")
-            # print(f"Already booked/waitlisted: {already_booked_waitlisted}")
-            # print(f'Total Tuesday & Thursday 6pm classes: {booked_classes + waitlists_joined + already_booked_waitlisted}')
-
-            # print('--- DETAILED CLASS LIST ---')
-            # for class_ in processed_classes:
-            #     print(f'•{class_}')
+                        elif btn_text == 'waitlisted':
+                            already_booked_waitlisted += 1
+                            print(f'✓ Already on waitlist: {class_name} on {day_label}')
 
             total_expected_classes = booked_classes + waitlists_joined + already_booked_waitlisted
             self.verify_bookings(total_expected_classes)
 
         except Exception as e:
             print(f"An error occurred while finding class cards: {e}")
-        
 
-    def verify_bookings(self,total):
+    def verify_bookings(self, total):
         print(f"\n--- Total Tuesday/Thursday 6pm classes: {total} ---\n")
         print("--- VERIFYING ON MY BOOKINGS PAGE ---")
 
@@ -139,37 +107,32 @@ class GymBot:
             my_bookings_link = self.wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "My Bookings")))
             my_bookings_link.click()
 
-            self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'div[id^="booking-card-"]')))
+            self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div[id*='card-']")))
+
             booked_items = self.driver.find_elements(By.CSS_SELECTOR, 'div[id^="booking-card-"]')
-            waitlist_items = self.driver.find_elements(By.CSS_SELECTOR,'div[id^="waitlist-card"]')
+            waitlist_items = self.driver.find_elements(By.CSS_SELECTOR, 'div[id^="waitlist-card"]')
 
             all_cards = booked_items + waitlist_items
 
             if not all_cards:
                 raise NoSuchElementException
-            
+
             for card in all_cards:
                 try:
                     when_paragraph = card.find_element(By.XPATH, ".//p[strong[text()='When:']]")
                     when_text = when_paragraph.text
 
                     if ("Tue" in when_text or "Thu" in when_text) and "6:00 PM" in when_text:
-
                         class_name = card.find_element(By.TAG_NAME, "h3").text
                         card_id = card.get_attribute("id") or ""
-                        found_count +=1
-                        print(f"  ✓ Verified: {class_name}")
+                        found_count += 1
+                        status = " (Waitlist)" if "waitlist" in card_id else ""
+                        print(f"  ✓ Verified: {class_name}{status}")
                 except NoSuchElementException:
-                # Skip if no "When:" text found (not a booking card)
                     pass
-
-                
-
-                
 
         except NoSuchElementException:
             pass
-
         except Exception as e:
             print(f"An error occurred during verification: {e}")
 
@@ -183,7 +146,7 @@ class GymBot:
         if total == found_count:
             print("✅ SUCCESS: All bookings verified!")
         else:
-            diff = found_count - total
+            diff = total - found_count
             print(f"❌ MISMATCH: Missing {diff} {expected_word}")
 
 
