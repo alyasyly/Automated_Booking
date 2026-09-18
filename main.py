@@ -102,13 +102,13 @@ class GymBot:
         print("--- VERIFYING ON MY BOOKINGS PAGE ---")
 
         found_count = 0
-
         try:
             my_bookings_link = self.wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "My Bookings")))
             my_bookings_link.click()
 
             self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div[id*='card-']")))
-
+            self.wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'div[id^="booking-card-"]')))
+            self.wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'div[id^="waitlist-card"]')))
             booked_items = self.driver.find_elements(By.CSS_SELECTOR, 'div[id^="booking-card-"]')
             waitlist_items = self.driver.find_elements(By.CSS_SELECTOR, 'div[id^="waitlist-card"]')
 
